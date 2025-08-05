@@ -10,6 +10,8 @@ import xyz.wagyourtail.jsmacros.core.service.ServiceTrigger;
 import java.util.*;
 
 public class CoreConfigV2 {
+    
+    private transient Core<?, ?> runner;
 
     @Option(translationKey = "jsmacros.maxlocktime", group = "jsmacros.settings.general")
     public long maxLockTime = 500;
@@ -38,12 +40,12 @@ public class CoreConfigV2 {
     //"synthetic" option
     @Option(translationKey = "jsmacros.currentprofile", group = "jsmacros.settings.profile", setter = "setCurrentProfile", options = "profileOptions")
     public String getCurrentProfile() {
-        return Core.getInstance().profile.getCurrentProfileName();
+        return runner.profile.getCurrentProfileName();
     }
 
     public void setCurrentProfile(String pname) {
-        Core.getInstance().profile.saveProfile();
-        Core.getInstance().profile.loadOrCreateProfile(pname);
+        runner.profile.saveProfile();
+        runner.profile.loadOrCreateProfile(pname);
     }
 
     public List<String> profileOptions() {
@@ -51,7 +53,7 @@ public class CoreConfigV2 {
     }
 
     public List<String> getEvents() {
-        return new ArrayList<>(Core.getInstance().eventRegistry.events);
+        return new ArrayList<>(runner.eventRegistry.events);
     }
 
     @Deprecated

@@ -4,25 +4,26 @@ import com.google.gson.annotations.SerializedName;
 import xyz.wagyourtail.jsmacros.core.Core;
 
 import java.io.File;
+import java.nio.file.Path;
 
 public class ScriptTrigger {
     @SerializedName(value = "triggerType", alternate = "type")
     public TriggerType triggerType;
     @SerializedName(value = "event", alternate = "eventkey")
     public String event;
-    public String scriptFile;
+    public Path scriptFile;
     public boolean enabled;
     public boolean joined;
 
-    public ScriptTrigger(TriggerType triggerType, String event, File scriptFile, boolean enabled, boolean joined) {
-        this(triggerType, event, Core.getInstance().config.macroFolder.getAbsoluteFile().toPath().relativize(scriptFile.getAbsoluteFile().toPath()).toString(), enabled, joined);
+    public ScriptTrigger(TriggerType triggerType, String event, Path scriptFile, boolean enabled, boolean joined) {
+        this(triggerType, event, scriptFile.toString(), enabled, joined);
     }
 
     @Deprecated
     public ScriptTrigger(TriggerType triggerType, String event, String scriptFile, boolean enabled, boolean joined) {
         this.triggerType = triggerType;
         this.event = event;
-        this.scriptFile = scriptFile;
+        this.scriptFile = Path.of(scriptFile);
         this.enabled = enabled;
         this.joined = joined;
     }
@@ -75,6 +76,14 @@ public class ScriptTrigger {
      * @since 1.2.7
      */
     public String getScriptFile() {
+        return scriptFile.toString();
+    }
+
+    /**
+     * @since 2.0.0
+     * @return
+     */
+    public Path getScriptPath() {
         return scriptFile;
     }
 

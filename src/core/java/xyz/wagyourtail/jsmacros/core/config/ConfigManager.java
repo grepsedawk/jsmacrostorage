@@ -2,19 +2,50 @@ package xyz.wagyourtail.jsmacros.core.config;
 
 import com.google.common.io.Files;
 import com.google.gson.*;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
 import org.slf4j.Logger;
+import xyz.wagyourtail.jsmacros.core.Core;
 
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ConfigManager {
-    protected final static Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    protected final static Gson gson = new GsonBuilder()
+        .registerTypeAdapter(File.class, new TypeAdapter<File>() {
+            @Override
+            public void write(JsonWriter jsonWriter, File file) throws IOException {
+                jsonWriter.value(file.getPath());
+            }
+
+            @Override
+            public File read(JsonReader jsonReader) throws IOException {
+                return new File(jsonReader.nextString());
+            }
+        })
+        .registerTypeHierarchyAdapter(Path.class, new TypeAdapter<Path>() {
+
+            @Override
+            public void write(JsonWriter jsonWriter, Path path) throws IOException {
+                jsonWriter.value(path.toString());
+            }
+
+            @Override
+            public Path read(JsonReader jsonReader) throws IOException {
+                return Path.of(jsonReader.nextString());
+            }
+
+        }).setPrettyPrinting().create();
+
+    private final Core<?, ?> runner;
     public final Map<String, Class<?>> optionClasses = new LinkedHashMap<>();
     public final Map<Class<?>, Object> options = new LinkedHashMap<>();
     public final File configFolder;
@@ -24,7 +55,8 @@ public class ConfigManager {
     int loadedAsVers = 3;
     public JsonObject rawOptions = null;
 
-    public ConfigManager(File configFolder, File macroFolder, Logger logger) {
+    public ConfigManager(Core<?, ?> runner, File configFolder, File macroFolder, Logger logger) {
+        this.runner = runner;
         this.configFolder = configFolder.getAbsoluteFile();
         this.macroFolder = macroFolder.getAbsoluteFile();
         this.LOGGER = logger;
@@ -48,12 +80,16 @@ public class ConfigManager {
 
         try {
             loadConfig();
-        } catch (IllegalAccessException | InstantiationException | IOException e) {
+        } catch (IllegalAccessException | InstantiationException | IOException | InvocationTargetException | NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public synchronized void reloadRawConfigFromFile() throws IOException {
+    public synchronized void reloadRawConfigFromFile() throws IOException, InvocationTargetException, IllegalAccessException, InstantiationException, NoSuchMethodException {
+        if (!configFile.exists()) {
+            loadDefaults();
+            return;
+        }
         try (FileReader reader = new FileReader(configFile)) {
             rawOptions = new JsonParser().parse(reader).getAsJsonObject();
             JsonElement version = rawOptions.get("version");
@@ -61,21 +97,35 @@ public class ConfigManager {
         }
     }
 
-    public synchronized void convertConfigFormat() throws IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException {
+    protected synchronized void convertOrLoadConfigs() throws IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException, IOException {
         for (Map.Entry<String, Class<?>> optionClass : optionClasses.entrySet()) {
-            convertConfigFormat(optionClass.getValue());
+            try {
+                convertOrLoadConfig(optionClass.getKey(), optionClass.getValue());
+            } catch (Exception e) {
+                backupConfig();
+                LOGGER.error("Failed to load option " + optionClass.getKey(), e);
+                options.put(optionClass.getValue(), optionClass.getValue().getConstructor().newInstance());
+            }
+            if (options.get(optionClass.getValue()) == null) {
+                options.put(optionClass.getValue(), optionClass.getValue().getConstructor().newInstance());
+            }
+            try {
+                Field f = optionClass.getValue().getDeclaredField("runner");
+                f.setAccessible(true);
+                f.set(options.get(optionClass.getValue()), runner);
+            } catch (NoSuchFieldException ignored) {}
         }
         rawOptions.addProperty("version", 3);
     }
 
-    public synchronized void convertConfigFormat(Class<?> clazz) throws IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException {
+    protected synchronized void convertOrLoadConfig(String key, Class<?> clazz) throws IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException {
         try {
             Method m = clazz.getDeclaredMethod("fromV" + loadedAsVers, JsonObject.class);
             Object option = clazz.getDeclaredConstructor().newInstance();
             m.invoke(option, rawOptions);
             options.put(clazz, option);
         } catch (NoSuchMethodException ignored) {
-            options.put(clazz, clazz.getDeclaredConstructor().newInstance());
+            options.put(clazz, gson.fromJson(rawOptions.get(key), clazz));
         }
     }
 
@@ -87,71 +137,50 @@ public class ConfigManager {
         return (T) options.get(optionClass);
     }
 
-    public synchronized void addOptions(String key, Class<?> optionClass) throws IllegalAccessException, InstantiationException {
+    public synchronized void addOptions(String key, Class<?> optionClass) throws IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException, IOException {
         if (optionClasses.containsKey(key)) {
             throw new IllegalStateException("Key \"" + key + "\" already in config manager!");
         }
         optionClasses.put(key, optionClass);
         try {
-            if (loadedAsVers != 3) {
-                convertConfigFormat(optionClass);
-            }
-            if (loadedAsVers != 1) {
-                if (!rawOptions.has(key)) {
-                    throw new NullPointerException();
-                }
-                options.put(optionClass, gson.fromJson(rawOptions.get(key), optionClass));
-            }
+            convertOrLoadConfig(key, optionClass);
         } catch (Exception ex) {
-            ex.printStackTrace();
-            options.put(optionClass, optionClass.newInstance());
+            backupConfig();
+            LOGGER.error("Failed to load option " + key, ex);
+            options.put(optionClass, optionClass.getConstructor().newInstance());
             saveConfig();
         }
+        if (options.get(optionClass) == null) {
+            options.put(optionClass, optionClass.getConstructor().newInstance());
+        }
+        try {
+            Field f = optionClass.getDeclaredField("runner");
+            f.setAccessible(true);
+            f.set(options.get(optionClass), runner);
+        } catch (NoSuchFieldException ignored) {}
     }
 
-    public synchronized void loadConfig() throws IllegalAccessException, InstantiationException, IOException {
+    public synchronized void backupConfig() throws IOException {
+        final File back = new File(configFolder, "options.json.v" + loadedAsVers + ".bak");
+        if (back.exists()) {
+            back.delete();
+        }
+        Files.move(configFile, back);
+        saveConfig();
+    }
+
+    public synchronized void loadConfig() throws IllegalAccessException, InstantiationException, IOException, InvocationTargetException, NoSuchMethodException {
+        options.clear();
+        reloadRawConfigFromFile();
         try {
-            options.clear();
-            if (rawOptions == null) {
-                reloadRawConfigFromFile();
-            }
-            if (loadedAsVers != 3) {
-                try {
-                    convertConfigFormat();
-                } finally {
-                    final File back = new File(configFolder, "options.json.v" + loadedAsVers + ".bak");
-                    if (back.exists()) {
-                        back.delete();
-                    }
-                    Files.move(configFile, back);
-                    saveConfig();
-                }
-            }
-            if (loadedAsVers != 1) {
-                for (Map.Entry<String, Class<?>> optionClass : optionClasses.entrySet()) {
-                    try {
-                        if (!rawOptions.has(optionClass.getKey())) {
-                            throw new NullPointerException();
-                        }
-                        options.put(optionClass.getValue(), gson.fromJson(rawOptions.get(optionClass.getKey()), optionClass.getValue()));
-                    } catch (JsonSyntaxException | NullPointerException ignored) {
-                        options.put(optionClass.getValue(), optionClass.getValue().newInstance());
-                        saveConfig();
-                    }
-                }
-            }
-        } catch (Exception e) {
-            LOGGER.error("Config Failed To Load.");
-            e.printStackTrace();
-            if (configFile.exists()) {
-                final File back = new File(configFolder, "options.json.bak");
-                if (back.exists()) {
-                    back.delete();
-                }
-                Files.move(configFile, back);
-            }
+            convertOrLoadConfigs();
+        } catch (InvocationTargetException | NoSuchMethodException e) {
+            LOGGER.error("Failed to load config", e);
             loadDefaults();
-            saveConfig();
+        } finally {
+            if (loadedAsVers != 3) {
+                backupConfig();
+            }
         }
         LOGGER.info("Loaded Profiles:");
         for (String key : getOptions(CoreConfigV2.class).profileOptions()) {
@@ -160,11 +189,11 @@ public class ConfigManager {
 
     }
 
-    public void loadDefaults() throws IllegalAccessException, InstantiationException {
+    public void loadDefaults() throws IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         for (Map.Entry<String, Class<?>> optionClass : optionClasses.entrySet()) {
-            options.put(optionClass.getValue(), optionClass.getValue().newInstance());
+            options.put(optionClass.getValue(), optionClass.getValue().getConstructor().newInstance());
             rawOptions = new JsonObject();
-            rawOptions.addProperty("version", 2);
+            rawOptions.addProperty("version", 3);
         }
     }
 

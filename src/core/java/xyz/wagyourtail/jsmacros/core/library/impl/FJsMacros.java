@@ -25,6 +25,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 
@@ -47,14 +48,14 @@ public class FJsMacros extends PerExecLibrary {
      * @return the JsMacros profile class.
      */
     public BaseProfile getProfile() {
-        return Core.getInstance().profile;
+        return runner.profile;
     }
 
     /**
      * @return the JsMacros config management class.
      */
     public ConfigManager getConfig() {
-        return Core.getInstance().config;
+        return runner.config;
     }
 
     /**
@@ -64,7 +65,7 @@ public class FJsMacros extends PerExecLibrary {
      * @since 1.6.3
      */
     public ServiceManager getServiceManager() {
-        return Core.getInstance().services;
+        return runner.services;
     }
 
     /**
@@ -72,7 +73,7 @@ public class FJsMacros extends PerExecLibrary {
      * @since 1.4.0
      */
     public List<BaseScriptContext<?>> getOpenContexts() {
-        return ImmutableList.copyOf(Core.getInstance().getContexts());
+        return ImmutableList.copyOf(runner.getContexts());
     }
 
     /**
@@ -105,9 +106,9 @@ public class FJsMacros extends PerExecLibrary {
      */
     public EventContainer<?> runScript(String file, @Nullable BaseEvent fakeEvent, @Nullable MethodWrapper<Throwable, Object, Object, ?> callback) {
         if (callback != null) {
-            return Core.getInstance().exec(new ScriptTrigger(ScriptTrigger.TriggerType.EVENT, "", Core.getInstance().config.macroFolder.getAbsoluteFile().toPath().resolve(file).toFile(), true, false), fakeEvent, () -> callback.accept(null), callback);
+            return runner.exec(new ScriptTrigger(ScriptTrigger.TriggerType.EVENT, "", Path.of(file), true, false), fakeEvent, () -> callback.accept(null), callback);
         } else {
-            return Core.getInstance().exec(new ScriptTrigger(ScriptTrigger.TriggerType.EVENT, "", Core.getInstance().config.macroFolder.getAbsoluteFile().toPath().resolve(file).toFile(), true, false), fakeEvent, null, null);
+            return runner.exec(new ScriptTrigger(ScriptTrigger.TriggerType.EVENT, "", Path.of(file), true, false), fakeEvent, null, null);
         }
     }
 
@@ -158,9 +159,9 @@ public class FJsMacros extends PerExecLibrary {
      */
     public EventContainer<?> runScript(String language, String script, @Nullable String file, @Nullable BaseEvent event, @Nullable MethodWrapper<Throwable, Object, Object, ?> callback) {
         if (callback != null) {
-            return Core.getInstance().exec(language, script, file != null ? ctx.getContainedFolder().toPath().resolve(file).toFile() : null, event, () -> callback.accept(null), callback);
+            return runner.exec(language, script, file != null ? ctx.getContainedFolder().toPath().resolve(file).toFile() : null, event, () -> callback.accept(null), callback);
         } else {
-            return Core.getInstance().exec(language, script, file != null ? ctx.getContainedFolder().toPath().resolve(file).toFile() : null, event, null, null);
+            return runner.exec(language, script, file != null ? ctx.getContainedFolder().toPath().resolve(file).toFile() : null, event, null, null);
         }
     }
 
@@ -173,7 +174,7 @@ public class FJsMacros extends PerExecLibrary {
      * @since 1.7.0
      */
     public <T, U, R> MethodWrapper<T, U, R, ?> wrapScriptRun(String file) {
-        return new WrappedScript<>((e) -> (EventContainer<BaseScriptContext<?>>) Core.getInstance().exec(new ScriptTrigger(ScriptTrigger.TriggerType.EVENT, e.getEventName(), Core.getInstance().config.macroFolder.getAbsoluteFile().toPath().resolve(file).toFile(), true, false), e, null, null), false);
+        return new WrappedScript<>(runner, (e) -> (EventContainer<BaseScriptContext<?>>) runner.exec(new ScriptTrigger(ScriptTrigger.TriggerType.EVENT, e.getEventName(), Path.of(file), true, false), e, null, null), false);
     }
 
     /**
@@ -186,7 +187,7 @@ public class FJsMacros extends PerExecLibrary {
      * @since 1.7.0
      */
     public <T, U, R> MethodWrapper<T, U, R, ?> wrapScriptRun(String language, String script) {
-        return new WrappedScript<>((e) -> (EventContainer<BaseScriptContext<?>>) Core.getInstance().exec(language, script, null, e, null, null), false);
+        return new WrappedScript<>(runner, (e) -> (EventContainer<BaseScriptContext<?>>) runner.exec(language, script, null, e, null, null), false);
     }
 
     /**
@@ -200,7 +201,7 @@ public class FJsMacros extends PerExecLibrary {
      * @since 1.7.0
      */
     public <T, U, R> MethodWrapper<T, U, R, ?> wrapScriptRun(String language, String script, @Nullable String file) {
-        return new WrappedScript<>((e) -> (EventContainer<BaseScriptContext<?>>) Core.getInstance().exec(language, script, file != null ? ctx.getContainedFolder().toPath().resolve(file).toFile() : null, e, null, null), false);
+        return new WrappedScript<>(runner, (e) -> (EventContainer<BaseScriptContext<?>>) runner.exec(language, script, file != null ? ctx.getContainedFolder().toPath().resolve(file).toFile() : null, e, null, null), false);
     }
 
     /**
@@ -212,7 +213,7 @@ public class FJsMacros extends PerExecLibrary {
      * @since 1.7.0
      */
     public <T, U, R> MethodWrapper<T, U, R, ?> wrapScriptRunAsync(String file) {
-        return new WrappedScript<>((e) -> (EventContainer<BaseScriptContext<?>>) Core.getInstance().exec(new ScriptTrigger(ScriptTrigger.TriggerType.EVENT, e.getEventName(), Core.getInstance().config.macroFolder.getAbsoluteFile().toPath().resolve(file).toFile(), true, false), e, null, null), true);
+        return new WrappedScript<>(runner, (e) -> (EventContainer<BaseScriptContext<?>>) runner.exec(new ScriptTrigger(ScriptTrigger.TriggerType.EVENT, e.getEventName(), Path.of(file), true, false), e, null, null), true);
     }
 
     /**
@@ -225,7 +226,7 @@ public class FJsMacros extends PerExecLibrary {
      * @since 1.7.0
      */
     public <T, U, R> MethodWrapper<T, U, R, ?> wrapScriptRunAsync(String language, String script) {
-        return new WrappedScript<>((e) -> (EventContainer<BaseScriptContext<?>>) Core.getInstance().exec(language, script, null, e, null, null), true);
+        return new WrappedScript<>(runner, (e) -> (EventContainer<BaseScriptContext<?>>) runner.exec(language, script, null, e, null, null), true);
     }
 
     /**
@@ -239,7 +240,7 @@ public class FJsMacros extends PerExecLibrary {
      * @since 1.7.0
      */
     public <T, U, R> MethodWrapper<T, U, R, ?> wrapScriptRunAsync(String language, String script, @Nullable String file) {
-        return new WrappedScript<>((e) -> (EventContainer<BaseScriptContext<?>>) Core.getInstance().exec(language, script, file != null ? ctx.getContainedFolder().toPath().resolve(file).toFile() : null, e, null, null), true);
+        return new WrappedScript<>(runner, (e) -> (EventContainer<BaseScriptContext<?>>) runner.exec(language, script, file != null ? ctx.getContainedFolder().toPath().resolve(file).toFile() : null, e, null, null), true);
     }
 
     /**
@@ -283,7 +284,7 @@ public class FJsMacros extends PerExecLibrary {
         Process process = (Process) Runtime.getRuntime().exec(urlOpen);
 
         for (String s2 : IOUtils.readLines(process.getErrorStream(), Charset.defaultCharset())) {
-            Core.getInstance().config.LOGGER.error(s2);
+            runner.config.LOGGER.error(s2);
         }
 
         process.getInputStream().close();
@@ -351,7 +352,7 @@ public class FJsMacros extends PerExecLibrary {
         if (callback == null) {
             return null;
         }
-        if (!Core.getInstance().eventRegistry.events.contains(event)) {
+        if (!runner.eventRegistry.events.contains(event)) {
             throw new IllegalArgumentException(String.format("Event \"%s\" not found, if it's a custom event register it with 'event.registerEvent()' first.", event));
         }
         if (filterer != null && !filterer.canFilter(event)) {
@@ -371,14 +372,14 @@ public class FJsMacros extends PerExecLibrary {
                 if (filterer != null && !filterer.test(e)) return null;
                 EventContainer<?> p = new EventContainer<>(callback.getCtx());
                 Thread ot = callback.overrideThread();
-                Thread th = Core.getInstance().threadPool.runTask(() -> {
+                Thread th = runner.threadPool.runTask(() -> {
                     Thread t = Thread.currentThread();
                     t.setName(this.toString());
                     try {
                         callback.accept(e, p);
                     } catch (Throwable ex) {
-                        Core.getInstance().eventRegistry.removeListener(event, this);
-                        Core.getInstance().profile.logError(ex);
+                        runner.eventRegistry.removeListener(event, this);
+                        runner.profile.logError(ex);
                     } finally {
                         p.releaseLock();
                     }
@@ -404,7 +405,7 @@ public class FJsMacros extends PerExecLibrary {
 
             @Override
             public void off() {
-                Core.getInstance().eventRegistry.removeListener(event, this);
+                runner.eventRegistry.removeListener(event, this);
             }
 
             @Override
@@ -412,7 +413,7 @@ public class FJsMacros extends PerExecLibrary {
                 return String.format("ScriptEventListener:{\"creator\":\"%s\", \"event\":\"%s\"}", getCreatorName(), event);
             }
         };
-        Core.getInstance().eventRegistry.addListener(event, listener);
+        runner.eventRegistry.addListener(event, listener);
         ctx.eventListeners.put(listener, event);
         return listener;
     }
@@ -448,7 +449,7 @@ public class FJsMacros extends PerExecLibrary {
         if (callback == null) {
             return null;
         }
-        if (!Core.getInstance().eventRegistry.events.contains(event)) {
+        if (!runner.eventRegistry.events.contains(event)) {
             throw new IllegalArgumentException(String.format("Event \"%s\" not found, if it's a custom event register it with 'event.registerEvent()' first.", event));
         }
         Thread th = Thread.currentThread();
@@ -461,17 +462,17 @@ public class FJsMacros extends PerExecLibrary {
 
             @Override
             public EventContainer<?> trigger(BaseEvent e) {
-                Core.getInstance().eventRegistry.removeListener(event, this);
+                runner.eventRegistry.removeListener(event, this);
                 EventContainer<?> p = new EventContainer<>(callback.getCtx());
                 Thread ot = callback.overrideThread();
-                Thread th = Core.getInstance().threadPool.runTask(() -> {
+                Thread th = runner.threadPool.runTask(() -> {
                     Thread t = Thread.currentThread();
 
                     t.setName(this.toString());
                     try {
                         callback.accept(e, p);
                     } catch (Throwable ex) {
-                        Core.getInstance().profile.logError(ex);
+                        runner.profile.logError(ex);
                     } finally {
                         p.releaseLock();
                     }
@@ -497,7 +498,7 @@ public class FJsMacros extends PerExecLibrary {
 
             @Override
             public void off() {
-                Core.getInstance().eventRegistry.removeListener(event, this);
+                runner.eventRegistry.removeListener(event, this);
             }
 
             @Override
@@ -506,7 +507,7 @@ public class FJsMacros extends PerExecLibrary {
             }
 
         };
-        Core.getInstance().eventRegistry.addListener(event, listener);
+        runner.eventRegistry.addListener(event, listener);
         ctx.eventListeners.put(listener, event);
         return listener;
     }
@@ -518,7 +519,7 @@ public class FJsMacros extends PerExecLibrary {
      * @since 1.2.3
      */
     public boolean off(IEventListener listener) {
-        return Core.getInstance().eventRegistry.removeListener(listener);
+        return runner.eventRegistry.removeListener(listener);
     }
 
     /**
@@ -533,7 +534,7 @@ public class FJsMacros extends PerExecLibrary {
     @DocletReplaceTypeParams("E extends keyof Events")
     @DocletReplaceParams("event: E, listener: IEventListener")
     public boolean off(String event, IEventListener listener) {
-        return Core.getInstance().eventRegistry.removeListener(event, listener);
+        return runner.eventRegistry.removeListener(event, listener);
     }
 
     /**
@@ -544,7 +545,7 @@ public class FJsMacros extends PerExecLibrary {
      */
     @DocletReplaceParams("event: keyof Events")
     public void disableAllListeners(String event) {
-        for (IEventListener listener : ImmutableList.copyOf(Core.getInstance().eventRegistry.getListeners(event))) {
+        for (IEventListener listener : ImmutableList.copyOf(runner.eventRegistry.getListeners(event))) {
             listener.off();
         }
     }
@@ -555,7 +556,7 @@ public class FJsMacros extends PerExecLibrary {
      * @since 1.8.4
      */
     public void disableAllListeners() {
-        for (Map.Entry<String, Set<IEventListener>> entry : Core.getInstance().eventRegistry.getListeners().entrySet()) {
+        for (Map.Entry<String, Set<IEventListener>> entry : runner.eventRegistry.getListeners().entrySet()) {
             for (IEventListener listener : ImmutableList.copyOf(entry.getValue())) {
                 listener.off();
             }
@@ -573,7 +574,7 @@ public class FJsMacros extends PerExecLibrary {
      */
     @DocletReplaceParams("event: keyof Events")
     public void disableScriptListeners(String event) {
-        for (IEventListener listener : ImmutableList.copyOf(Core.getInstance().eventRegistry.getListeners(event))) {
+        for (IEventListener listener : ImmutableList.copyOf(runner.eventRegistry.getListeners(event))) {
             if (listener instanceof ScriptEventListener) {
                 listener.off();
             }
@@ -589,7 +590,7 @@ public class FJsMacros extends PerExecLibrary {
      * @since 1.8.4
      */
     public void disableScriptListeners() {
-        for (Map.Entry<String, Set<IEventListener>> entry : Core.getInstance().eventRegistry.getListeners().entrySet()) {
+        for (Map.Entry<String, Set<IEventListener>> entry : runner.eventRegistry.getListeners().entrySet()) {
             for (IEventListener listener : ImmutableList.copyOf(entry.getValue())) {
                 if (listener instanceof ScriptEventListener) {
                     listener.off();
@@ -689,7 +690,7 @@ public class FJsMacros extends PerExecLibrary {
         // create a new event container so we can actually release joined events
         EventContainer<?>[] ctxCont = new EventContainer[]{new EventContainer<>(ctx)};
         ctx.wrapSleep(() -> {
-            if (!Core.getInstance().eventRegistry.events.contains(event)) {
+            if (!runner.eventRegistry.events.contains(event)) {
                 throw new IllegalArgumentException(String.format("Event \"%s\" not found, if it's a custom event register it with 'event.registerEvent()' first.", event));
             }
 
@@ -722,7 +723,7 @@ public class FJsMacros extends PerExecLibrary {
                     }
                     // if filter done, we can remove self and return the event context
                     if (done[0]) {
-                        Core.getInstance().eventRegistry.removeListener(event, this);
+                        runner.eventRegistry.removeListener(event, this);
                         ctx.bindEvent(th, (EventContainer) ctxCont[0]);
                         return ctxCont[0];
                     }
@@ -746,7 +747,7 @@ public class FJsMacros extends PerExecLibrary {
 
                 @Override
                 public void off() {
-                    Core.getInstance().eventRegistry.removeListener(event, this);
+                    runner.eventRegistry.removeListener(event, this);
                     th.interrupt();
                 }
 
@@ -756,7 +757,7 @@ public class FJsMacros extends PerExecLibrary {
                 }
             };
             // register the listener
-            Core.getInstance().eventRegistry.addListener(event, listener);
+            runner.eventRegistry.addListener(event, listener);
             ctx.eventListeners.put(listener, event);
 
             // run before, this is a thread-safety thing to prevent "interrupts" from going in between this and things like deferCurrentTask
@@ -778,7 +779,7 @@ public class FJsMacros extends PerExecLibrary {
                     // check the filter
                     done[0] = filter == null || filter.test(ev[0]);
                 } catch (Throwable ex) {
-                    Core.getInstance().eventRegistry.removeListener(event, listener);
+                    runner.eventRegistry.removeListener(event, listener);
                     throw new RuntimeException("Error thrown in filter", ex);
                 } finally {
                     lock2.release();
@@ -798,7 +799,7 @@ public class FJsMacros extends PerExecLibrary {
     @DocletReplaceParams("event: keyof Events")
     public List<IEventListener> listeners(String event) {
         List<IEventListener> listeners = new ArrayList<>();
-        for (IEventListener l : Core.getInstance().eventRegistry.getListeners(event)) {
+        for (IEventListener l : runner.eventRegistry.getListeners(event)) {
             if (!(l instanceof BaseListener)) {
                 listeners.add(l);
             }
@@ -815,9 +816,9 @@ public class FJsMacros extends PerExecLibrary {
     @DocletReplaceParams("event: E")
     @DocletReplaceReturn("EventFilterers[E]")
     public EventFilterer createEventFilterer(String event) {
-        Class<? extends EventFilterer> fclass = Core.getInstance().eventRegistry.filterableEvents.get(event);
+        Class<? extends EventFilterer> fclass = runner.eventRegistry.filterableEvents.get(event);
         if (fclass == null) {
-            if (Core.getInstance().eventRegistry.events.contains(event)) {
+            if (runner.eventRegistry.events.contains(event)) {
                 throw new IllegalArgumentException(String.format("Event %s doesn't have a filterer class!", event));
             } else {
                 throw new IllegalArgumentException(String.format("Event %s not found!", event));
@@ -868,7 +869,7 @@ public class FJsMacros extends PerExecLibrary {
      * @since 1.2.8
      */
     public EventCustom createCustomEvent(String eventName) {
-        return new EventCustom(eventName);
+        return new EventCustom(runner, eventName);
     }
 
     /**

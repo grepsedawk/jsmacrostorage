@@ -19,7 +19,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @Library("GlobalVars")
 @SuppressWarnings("unused")
 public class FGlobalVars extends BaseLibrary {
-    public static Map<String, Object> globalRaw = new ConcurrentHashMap<>();
+    public Map<String, Object> globalRaw = new ConcurrentHashMap<>();
+
+    public FGlobalVars(Core<?, ?> runner) {
+        super(runner);
+    }
 
     /**
      * Put an Integer into the global variable space.
@@ -82,7 +86,7 @@ public class FGlobalVars extends BaseLibrary {
      * @since 1.1.7
      */
     public Object putObject(String name, Object o) {
-        if (Core.getInstance().extensions.isGuestObject(o)) {
+        if (runner.extensions.isGuestObject(o)) {
             throw new AssertionError("Cannot put a guest object into global variables");
         }
         globalRaw.put(name, o);
@@ -140,16 +144,19 @@ public class FGlobalVars extends BaseLibrary {
      */
     @Nullable
     public Integer getAndIncrementInt(String name) {
-        Object i = globalRaw.get(name);
-        if (i instanceof Integer) {
-            globalRaw.put(name, ((Integer) i) + 1);
-            return (Integer) i;
-        } else if (i == null) {
-            globalRaw.put(name, 1);
-            return 0;
-        } else {
-            return null;
-        }
+        Integer[] value = new Integer[1];
+        globalRaw.compute(name, (k, v) -> {
+            if (v == null) {
+                value[0] = 0;
+                return 1;
+            } else if (v instanceof Integer) {
+                value[0] = (Integer) v;
+                return ((Integer) v) + 1;
+            } else {
+                return v;
+            }
+        });
+        return value[0];
     }
 
     /**
@@ -161,16 +168,20 @@ public class FGlobalVars extends BaseLibrary {
      */
     @Nullable
     public Integer getAndDecrementInt(String name) {
-        Object i = globalRaw.get(name);
-        if (i instanceof Integer) {
-            globalRaw.put(name, ((Integer) i) - 1);
-            return (Integer) i;
-        } else if (i == null) {
-            globalRaw.put(name, -1);
-            return 0;
-        } else {
-            return null;
-        }
+        Integer[] value = new Integer[1];
+        globalRaw.compute(name, (k, v) -> {
+            if (v == null) {
+                value[0] = 0;
+                return -1;
+            } else if (v instanceof Integer) {
+                value[0] = (Integer) v;
+                return ((Integer) v) - 1;
+            } else {
+                return v;
+            }
+        });
+        return value[0];
+
     }
 
     /**
@@ -182,16 +193,19 @@ public class FGlobalVars extends BaseLibrary {
      */
     @Nullable
     public Integer incrementAndGetInt(String name) {
-        Object i = globalRaw.get(name);
-        if (i instanceof Integer) {
-            globalRaw.put(name, i = ((Integer) i) + 1);
-            return (Integer) i;
-        } else if (i == null) {
-            globalRaw.put(name, 1);
-            return 1;
-        } else {
-            return null;
+        Object o = globalRaw.compute(name, (k, v) -> {
+            if (v == null) {
+                return 1;
+            } else if (v instanceof Integer) {
+                return ((Integer) v) + 1;
+            } else {
+                return v;
+            }
+        });
+        if (o instanceof Integer) {
+            return (Integer) o;
         }
+        return null;
     }
 
     /**
@@ -203,16 +217,19 @@ public class FGlobalVars extends BaseLibrary {
      */
     @Nullable
     public Integer decrementAndGetInt(String name) {
-        Object i = globalRaw.get(name);
-        if (i instanceof Integer) {
-            globalRaw.put(name, i = ((Integer) i) - 1);
-            return (Integer) i;
-        } else if (i == null) {
-            globalRaw.put(name, -1);
-            return -1;
-        } else {
-            return null;
+        Object o = globalRaw.compute(name, (k, v) -> {
+            if (v == null) {
+                return -1;
+            } else if (v instanceof Integer) {
+                return ((Integer) v) - 1;
+            } else {
+                return v;
+            }
+        });
+        if (o instanceof Integer) {
+            return (Integer) o;
         }
+        return null;
     }
 
     /**
@@ -275,16 +292,19 @@ public class FGlobalVars extends BaseLibrary {
      */
     @Nullable
     public Boolean toggleBoolean(String name) {
-        Object i = globalRaw.get(name);
-        if (i instanceof Boolean) {
-            globalRaw.put(name, !(Boolean) i);
-            return !(Boolean) i;
-        } else if (i == null) {
-            globalRaw.put(name, true);
-            return true;
-        } else {
-            return null;
+        Object o = globalRaw.compute(name, (k, v) -> {
+            if (v == null) {
+                return true;
+            } else if (v instanceof Boolean) {
+                return !((Boolean) v);
+            } else {
+                return v;
+            }
+        });
+        if (o instanceof Boolean) {
+            return (Boolean) o;
         }
+        return null;
     }
 
     /**

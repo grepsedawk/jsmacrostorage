@@ -8,7 +8,7 @@ import net.neoforged.neoforge.client.ClientCommandHandler;
 import xyz.wagyourtail.jsmacros.client.access.CommandNodeAccessor;
 import xyz.wagyourtail.jsmacros.client.api.classes.inventory.CommandBuilder;
 import xyz.wagyourtail.jsmacros.client.api.classes.inventory.CommandManager;
-import xyz.wagyourtail.jsmacros.client.api.helpers.CommandNodeHelper;
+import xyz.wagyourtail.jsmacros.client.api.helper.CommandNodeHelper;
 
 public class CommandManagerForge extends CommandManager {
 
@@ -32,7 +32,7 @@ public class CommandManagerForge extends CommandManager {
     @Override
     public void reRegisterCommand(CommandNodeHelper node) {
         if (node.fabric != null) {
-            ClientCommandHandler.getDispatcher().getRoot().addChild(node.fabric);
+            ClientCommandHandler.getDispatcher().getRoot().addChild((CommandNode) node.fabric);
         }
         ClientPlayNetworkHandler nh = MinecraftClient.getInstance().getNetworkHandler();
         if (nh != null) {

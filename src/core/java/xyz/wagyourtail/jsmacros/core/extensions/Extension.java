@@ -3,6 +3,7 @@ package xyz.wagyourtail.jsmacros.core.extensions;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import xyz.wagyourtail.jsmacros.core.Core;
 
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -34,7 +35,7 @@ public interface Extension {
         return "2.0.0";
     }
 
-    void init();
+    void init(Core<?, ?> runner);
 
     default Set<URL> getDependencies() {
         return getDependenciesInternal(this.getClass(), "jsmacros.ext." + getExtensionName() + ".json");
@@ -51,14 +52,27 @@ public interface Extension {
         if (dependencies == null) {
             return new HashSet<>();
         }
-        String dependenciesString = dependencies.getAsString();
-        if (dependenciesString.equals("${dependencies}")) {
-            return new HashSet<>();
+        String[] dependenciesArray;
+        if (dependencies.isJsonPrimitive()) {
+            String dependenciesString = dependencies.getAsString();
+            if (dependenciesString.equals("${dependencies}")) {
+                return new HashSet<>();
+            }
+            dependenciesArray = dependenciesString.split(" ");
+            for (int i = 0; i < dependenciesArray.length; i++) {
+                dependenciesArray[i] = "META-INF/jsmacrosdeps/" + dependenciesArray[i].trim();
+            }
+        } else if (dependencies.isJsonArray()) {
+            dependenciesArray = new String[dependencies.getAsJsonArray().size()];
+            for (int i = 0; i < dependenciesArray.length; i++) {
+                dependenciesArray[i] = dependencies.getAsJsonArray().get(i).getAsString();
+            }
+        } else {
+            throw new RuntimeException("Invalid dependencies format");
         }
-        String[] dependenciesArray = dependenciesString.split(" ");
         Set<URL> dependenciesSet = new HashSet<>();
         for (String dependency : dependenciesArray) {
-            URL resource = clazz.getResource("/META-INF/jsmacrosdeps/" + dependency.trim());
+            URL resource = clazz.getResource("/" + dependency);
             if (resource != null) {
                 dependenciesSet.add(resource);
             } else {
