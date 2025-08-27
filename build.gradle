@@ -3,7 +3,13 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 plugins {
     id "xyz.wagyourtail.unimined"
     id "com.github.johnrengelman.shadow" version "7.1.2"
+    id "maven-publish"
 }
+
+// Process enabled_loaders property
+def enabledLoadersList = project.hasProperty('enabled_loaders') ? 
+    project.enabled_loaders.split(',').collect { it.trim() } : 
+    ['fabric', 'forge']
 
 base {
     archivesName = project.archives_base_name
@@ -63,13 +69,13 @@ sourceSets {
         compileClasspath += core.output + core.compileClasspath
         runtimeClasspath += core.output + core.runtimeClasspath
     }
-    if (enabled_loaders.contains("forge")) {
+    if (enabledLoadersList.contains("forge")) {
         forge {
             compileClasspath += core.output + core.compileClasspath + main.output + configurations.implementation
             runtimeClasspath += core.output + core.runtimeClasspath + main.output + configurations.implementation
         }
     }
-    if (enabled_loaders.contains("fabric")) {
+    if (enabledLoadersList.contains("fabric")) {
         fabric {
             compileClasspath += core.output + core.compileClasspath + main.output + configurations.implementation
             runtimeClasspath += core.output + core.runtimeClasspath + main.output + configurations.implementation
@@ -114,7 +120,7 @@ sourceSets {
 }
 
 
-if (enabled_loaders.contains("forge")) {
+if (enabledLoadersList.contains("forge")) {
 
     unimined.minecraft(sourceSets.forge) {
         combineWith(sourceSets.main)
@@ -132,7 +138,7 @@ if (enabled_loaders.contains("forge")) {
 
 }
 
-if (enabled_loaders.contains("fabric")) {
+if (enabledLoadersList.contains("fabric")) {
 
     unimined.minecraft(sourceSets.fabric) {
         combineWith(sourceSets.main)
@@ -157,7 +163,7 @@ dependencies {
     jsmacrosExtensionInclude(project(":extension:graal")) { transitive = false }
     jsmacrosExtensionInclude(project(":extension:graal:js")) { transitive = false }
 
-    if (enabled_loaders.contains("fabric")) {
+    if (enabledLoadersList.contains("fabric")) {
 
         fabricModImplementation fabricApi.fabricModule("fabric-api-base", project.fapi_version)
         fabricModImplementation fabricApi.fabricModule("fabric-lifecycle-events-v1", project.fapi_version)
@@ -183,7 +189,7 @@ dependencies {
         fabricRuntimeOnly(project(":extension:graal:js"))
     }
 
-    if (enabled_loaders.contains("forge")) {
+    if (enabledLoadersList.contains("forge")) {
 
         forgeInclude "io.noties:prism4j:${project.prism_version}", {
             exclude module: "annotations-java5"
@@ -220,7 +226,7 @@ jar {
     enabled = false
 }
 
-if (enabled_loaders.contains("forge")) {
+if (enabledLoadersList.contains("forge")) {
     processForgeResources {
         inputs.property "version", project.version
 
@@ -276,7 +282,7 @@ if (enabled_loaders.contains("forge")) {
     }
 }
 
-if (enabled_loaders.contains("fabric")) {
+if (enabledLoadersList.contains("fabric")) {
     processFabricResources {
         inputs.property "version", project.version
 
@@ -392,3 +398,11 @@ task createDist(type: Copy) {
 }
 
 build.finalizedBy(createDist)
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+        }
+    }
+}
